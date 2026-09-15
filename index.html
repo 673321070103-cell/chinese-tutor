@@ -5,16 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ฝึกพูดภาษาจีนกับครูหนิง</title>
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #F6F0E4; }
-    iframe { width: 100%; height: 100%; border: none; }
+    html, body { 
+      margin: 0; 
+      padding: 0; 
+      width: 100%; 
+      height: 100%; 
+      overflow: hidden; 
+      background-color: #F6F0E4; 
+    }
+    iframe { 
+      width: 100%; 
+      height: 100%; 
+      border: none; 
+    }
   </style>
 </head>
 <body>
-  <!-- เปลี่ยน URL ใน src เป็นลิงก์ /exec ของ Google Apps Script คุณ -->
+
+  <!-- แก้ไขโดยตัด sandbox ออกเพื่อให้ iframe ชั้นในขอสิทธิ์ไมโครโฟนได้เต็มที่ -->
   <iframe 
     src="https://script.google.com/macros/s/AKfycbx3AFDwF4sUed40ipYWs6Xe1OWhKgGy2kaWXepGoOkoT4y0ODNB6obdej68mI0Q-w8J/exec" 
-    allow="microphone; camera; autoplay; clipboard-write;"
-    sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts">
+    allow="microphone *; speech-recognition *; autoplay *;">
   </iframe>
+
 </body>
 </html>

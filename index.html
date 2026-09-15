@@ -1,32 +1,1090 @@
 <!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="UTF-8">
+<html>
+  <head>
+  <base target="_top">
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate" />
+  <meta http-equiv="Permissions-Policy" content="microphone=(self), autoplay=(self)">
   <title>ฝึกพูดภาษาจีนกับครูหนิง</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
   <style>
-    html, body { 
-      margin: 0; 
-      padding: 0; 
-      width: 100%; 
-      height: 100%; 
-      overflow: hidden; 
-      background-color: #F6F0E4; 
-    }
-    iframe { 
-      width: 100%; 
-      height: 100%; 
-      border: none; 
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+Thai:wght@400;500;600;700&family=Noto+Sans:ital,wght@0,400;0,600;1,400&display=swap');
+    body { margin: 0; padding: 0; background: #F6F0E4; }
+    .csp-hanzi { font-family: 'Noto Serif SC', serif; }
+    .csp-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
+    .csp-scroll::-webkit-scrollbar-thumb { background: #D9CFB8; border-radius: 4px; }
+    .csp-opt:hover { border-color: #AC3433 !important; }
+    @keyframes csp-pop { 0%{transform:scale(0.96);opacity:0.6} 100%{transform:scale(1);opacity:1} }
   </style>
 </head>
-<body>
+  <body>
+    <div id="root"></div>
 
-  <!-- แก้ไขโดยตัด sandbox ออกเพื่อให้ iframe ชั้นในขอสิทธิ์ไมโครโฟนได้เต็มที่ -->
-  <iframe 
-    src="https://script.google.com/macros/s/AKfycbzAGz5Qjtdle8kdgTZAbmzRrToasqrREniIquiO6Bbi_7jqDpD4G1bX7Xw0Zg1Gs3YD/exec" 
-    allow="microphone *; speech-recognition *; autoplay *;">
-  </iframe>
+    <script type="text/babel">
+      const { useState, useEffect, useRef, useCallback } = React;
 
-</body>
+      // Icon Components
+      const Volume2 = (p) => <i data-lucide="volume-2" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2 }} />;
+      const Mic = (p) => <i data-lucide="mic" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2 }} />;
+      const Square = (p) => <i data-lucide="square" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2 }} />;
+      const Check = (p) => <i data-lucide="check" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2, color: p.color }} />;
+      const X = (p) => <i data-lucide="x" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2, color: p.color }} />;
+      const RefreshCw = (p) => <i data-lucide="refresh-cw" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2 }} />;
+      const BookOpen = (p) => <i data-lucide="book-open" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2 }} />;
+      const Ear = (p) => <i data-lucide="ear" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2 }} />;
+      const ListChecks = (p) => <i data-lucide="list-checks" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2 }} />;
+      const MessageCircle = (p) => <i data-lucide="message-circle" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2 }} />;
+      const Send = (p) => <i data-lucide="send" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2 }} />;
+      const Sparkles = (p) => <i data-lucide="sparkles" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2, color: p.color }} />;
+      const ChevronLeft = (p) => <i data-lucide="chevron-left" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2 }} />;
+      const ChevronRight = (p) => <i data-lucide="chevron-right" style={{ width: p.size||24, height: p.size||24, strokeWidth: 2 }} />;
+
+      const COLORS = {
+        paper: '#F6F0E4',
+        paperDark: '#EEE4D0',
+        ink: '#26221C',
+        inkSoft: '#6B6355',
+        seal: '#AC3433',
+        sealSoft: '#D98E8C',
+        bamboo: '#54724F',
+        bambooSoft: '#E1E9DC',
+        gold: '#AD7F35',
+        line: '#D9CFB8',
+      };
+
+      const CATEGORIES = [
+        { key: 'greeting', label: 'ทักทาย', hanzi: '问候' },
+        { key: 'number', label: 'ตัวเลข/เวลา', hanzi: '数字时间' },
+        { key: 'daily', label: 'ชีวิตประจำวัน', hanzi: '日常' },
+        { key: 'food', label: 'อาหาร/เครื่องดื่ม', hanzi: '美食' },
+        { key: 'travel', label: 'การเดินทาง/ท่องเที่ยว', hanzi: '旅行' },
+      ];
+
+      const VOCAB = [
+        // ==========================================
+        // 1. หมวดทักทาย & มารยาท (Greeting) - 50 คำ
+        // ==========================================
+        { id: 'g1', category: 'greeting', hanzi: '你好', pinyin: 'nǐ hǎo', thai: 'สวัสดี' },
+        { id: 'g2', category: 'greeting', hanzi: '您好', pinyin: 'nín hǎo', thai: 'สวัสดี (สุภาพ)' },
+        { id: 'g3', category: 'greeting', hanzi: '谢谢', pinyin: 'xiè xie', thai: 'ขอบคุณ' },
+        { id: 'g4', category: 'greeting', hanzi: '非常感谢', pinyin: 'fēi cháng gǎn xiè', thai: 'ขอบคุณมากจริงๆ' },
+        { id: 'g5', category: 'greeting', hanzi: '不客气', pinyin: 'bú kè qi', thai: 'ไม่เป็นไร (ตอบรับคำขอบคุณ)' },
+        { id: 'g6', category: 'greeting', hanzi: '不用谢', pinyin: 'bú yòng xiè', thai: 'ไม่ต้องขอบคุณ' },
+        { id: 'g7', category: 'greeting', hanzi: '对不起', pinyin: 'duì bu qǐ', thai: 'ขอโทษ' },
+        { id: 'g8', category: 'greeting', hanzi: '抱歉', pinyin: 'bào qiàn', thai: 'ขออภัย' },
+        { id: 'g9', category: 'greeting', hanzi: '没关系', pinyin: 'méi guān xi', thai: 'ไม่เป็นไร (ตอบรับคำขอโทษ)' },
+        { id: 'g10', category: 'greeting', hanzi: '没事', pinyin: 'méi shì', thai: 'ไม่เป็นไร / ไม่มีอะไร' },
+        { id: 'g11', category: 'greeting', hanzi: '再见', pinyin: 'zài jiàn', thai: 'ลาก่อน' },
+        { id: 'g12', category: 'greeting', hanzi: '拜拜', pinyin: 'bài bai', thai: 'บ๊ายบาย' },
+        { id: 'g13', category: 'greeting', hanzi: '早上好', pinyin: 'zǎo shang hǎo', thai: 'อรุณสวัสดิ์' },
+        { id: 'g14', category: 'greeting', hanzi: '早安', pinyin: 'zǎo ān', thai: 'อรุณสวัสดิ์ (สั้น)' },
+        { id: 'g15', category: 'greeting', hanzi: '午安', pinyin: 'wǔ ān', thai: 'สวัสดียามบ่าย' },
+        { id: 'g16', category: 'greeting', hanzi: '晚上好', pinyin: 'wǎn shang hǎo', thai: 'สวัสดียามเย็น' },
+        { id: 'g17', category: 'greeting', hanzi: '晚安', pinyin: 'wǎn ān', thai: 'ราตรีสวัสดิ์' },
+        { id: 'g18', category: 'greeting', hanzi: '好久不见', pinyin: 'hǎo jiǔ bú jiàn', thai: 'ไม่ได้เจอกันนานเลย' },
+        { id: 'g19', category: 'greeting', hanzi: '最近怎么样', pinyin: 'zuì jìn zěn me yàng', thai: 'ช่วงนี้เป็นอย่างไรบ้าง' },
+        { id: 'g20', category: 'greeting', hanzi: '挺好的', pinyin: 'tǐng hǎo de', thai: 'ค่อนข้างดีเลย' },
+        { id: 'g21', category: 'greeting', hanzi: '还行', pinyin: 'hái xíng', thai: 'ก็เรื่อยๆ / พอใช้ได้' },
+        { id: 'g22', category: 'greeting', hanzi: '明天见', pinyin: 'míng tiān jiàn', thai: 'พรุ่งนี้เจอกัน' },
+        { id: 'g23', category: 'greeting', hanzi: '一会儿见', pinyin: 'yí huì r jiàn', thai: 'อีกสักครู่เจอกัน' },
+        { id: 'g24', category: 'greeting', hanzi: '周一见', pinyin: 'zhōu yī jiàn', thai: 'วันจันทร์เจอกัน' },
+        { id: 'g25', category: 'greeting', hanzi: '欢迎', pinyin: 'huān yíng', thai: 'ยินดีต้อนรับ' },
+        { id: 'g26', category: 'greeting', hanzi: '欢迎光临', pinyin: 'huān yíng guāng lín', thai: 'ยินดีต้อนรับ (ร้านค้า)' },
+        { id: 'g27', category: 'greeting', hanzi: '请进', pinyin: 'qǐng jìn', thai: 'เชิญเข้าด้านใน' },
+        { id: 'g28', category: 'greeting', hanzi: '请坐', pinyin: 'qǐng zuò', thai: 'เชิญนั่ง' },
+        { id: 'g29', category: 'greeting', hanzi: '请问', pinyin: 'qǐng wèn', thai: 'ขอสอบถามหน่อย' },
+        { id: 'g30', category: 'greeting', hanzi: '麻烦你了', pinyin: 'má fan nǐ le', thai: 'รบกวนคุณแล้ว' },
+        { id: 'g31', category: 'greeting', hanzi: '辛苦了', pinyin: 'xīn kǔ le', thai: 'เหนื่อยหน่อยนะ / เหน็ดเหนื่อยแล้ว' },
+        { id: 'g32', category: 'greeting', hanzi: '保重', pinyin: 'bǎo zhòng', thai: 'ดูแลตัวเองด้วย' },
+        { id: 'g33', category: 'greeting', hanzi: '祝你好运', pinyin: 'zhù nǐ hǎo yùn', thai: 'โชคดีนะ' },
+        { id: 'g34', category: 'greeting', hanzi: '祝贺你', pinyin: 'zhù hè nǐ', thai: 'ขอแสดงความยินดีด้วย' },
+        { id: 'g35', category: 'greeting', hanzi: '生日快乐', pinyin: 'shēng rì kuài lè', thai: 'สุขสันต์วันเกิด' },
+        { id: 'g36', category: 'greeting', hanzi: '新年快乐', pinyin: 'xīn nián kuài lè', thai: 'สวัสดีปีใหม่' },
+        { id: 'g37', category: 'greeting', hanzi: '一路平安', pinyin: 'yí lù píng ān', thai: 'เดินทางโดยสวัสดิภาพ' },
+        { id: 'g38', category: 'greeting', hanzi: '加油', pinyin: 'jiā yóu', thai: 'สู้ๆ' },
+        { id: 'g39', category: 'greeting', hanzi: '很高兴认识你', pinyin: 'hěn gāo xìng rèn shi nǐ', thai: 'ยินดีที่ได้รู้จัก' },
+        { id: 'g40', category: 'greeting', hanzi: '我也是', pinyin: 'wǒ yě shì', thai: 'ฉันก็เช่นกัน' },
+        { id: 'g41', category: 'greeting', hanzi: '久仰久仰', pinyin: 'jiǔ yǎng jiǔ yǎng', thai: 'ได้ยินชื่อเสียงมานาน' },
+        { id: 'g42', category: 'greeting', hanzi: '慢走', pinyin: 'màn zǒu', thai: 'เดินกลับดีๆ นะ / เดินทางปลอดภัย' },
+        { id: 'g43', category: 'greeting', hanzi: '请多关照', pinyin: 'qǐng duō guān zhào', thai: 'ฝากเนื้อฝากตัวด้วย' },
+        { id: 'g44', category: 'greeting', hanzi: '好样儿的', pinyin: 'hǎo yàng r de', thai: 'เก่งมาก / เยี่ยมมาก' },
+        { id: 'g45', category: 'greeting', hanzi: '真棒', pinyin: 'zhēn bàng', thai: 'ยอดเยี่ยมจริงๆ' },
+        { id: 'g46', category: 'greeting', hanzi: '真的吗', pinyin: 'zhēn de ma', thai: 'จริงเหรอ' },
+        { id: 'g47', category: 'greeting', hanzi: '当然', pinyin: 'dāng rán', thai: 'แน่นอน' },
+        { id: 'g48', category: 'greeting', hanzi: '好的', pinyin: 'hǎo de', thai: 'ตกลง / OK' },
+        { id: 'g49', category: 'greeting', hanzi: '行', pinyin: 'xíng', thai: 'ได้ / โอเค' },
+        { id: 'g50', category: 'greeting', hanzi: '不行', pinyin: 'bù xíng', thai: 'ไม่ได้' },
+
+        // ==========================================
+        // 2. หมวดตัวเลข วัน เวลา & ราคา (Number) - 50 คำ
+        // ==========================================
+        { id: 'n1', category: 'number', hanzi: '零', pinyin: 'líng', thai: 'ศูนย์' },
+        { id: 'n2', category: 'number', hanzi: '一', pinyin: 'yī', thai: 'หนึ่ง' },
+        { id: 'n3', category: 'number', hanzi: '二', pinyin: 'èr', thai: 'สอง' },
+        { id: 'n4', category: 'number', hanzi: '三', pinyin: 'sān', thai: 'สาม' },
+        { id: 'n5', category: 'number', hanzi: '四', pinyin: 'sì', thai: 'สี่' },
+        { id: 'n6', category: 'number', hanzi: '五', pinyin: 'wǔ', thai: 'ห้า' },
+        { id: 'n7', category: 'number', hanzi: '六', pinyin: 'liù', thai: 'หก' },
+        { id: 'n8', category: 'number', hanzi: '七', pinyin: 'qī', thai: 'เจ็ด' },
+        { id: 'n9', category: 'number', hanzi: '八', pinyin: 'bā', thai: 'แปด' },
+        { id: 'n10', category: 'number', hanzi: '九', pinyin: 'jiǔ', thai: 'เก้า' },
+        { id: 'n11', category: 'number', hanzi: '十', pinyin: 'shí', thai: 'สิบ' },
+        { id: 'n12', category: 'number', hanzi: '两', pinyin: 'liǎng', thai: 'สอง (ใช้กับจำนวนนับ)' },
+        { id: 'n13', category: 'number', hanzi: '百', pinyin: 'bǎi', thai: 'ร้อย' },
+        { id: 'n14', category: 'number', hanzi: '千', pinyin: 'qiān', thai: 'พัน' },
+        { id: 'n15', category: 'number', hanzi: '万', pinyin: 'wàn', thai: 'หมื่น' },
+        { id: 'n16', category: 'number', hanzi: '第一', pinyin: 'dì yī', thai: 'อันดับที่หนึ่ง' },
+        { id: 'n17', category: 'number', hanzi: '今天', pinyin: 'jīn tiān', thai: 'วันนี้' },
+        { id: 'n18', category: 'number', hanzi: '明天', pinyin: 'míng tiān', thai: 'พรุ่งนี้' },
+        { id: 'n19', category: 'number', hanzi: '昨天', pinyin: 'zuó tiān', thai: 'เมื่อวาน' },
+        { id: 'n20', category: 'number', hanzi: '后天', pinyin: 'hòu tiān', thai: 'มะรืนนี้' },
+        { id: 'n21', category: 'number', hanzi: '前天', pinyin: 'qián tiān', thai: 'เมื่อวานซืน' },
+        { id: 'n22', category: 'number', hanzi: '现在', pinyin: 'xiàn zài', thai: 'ตอนนี้' },
+        { id: 'n23', category: 'number', hanzi: '点', pinyin: 'diǎn', thai: 'นาฬิกา (โมง)' },
+        { id: 'n24', category: 'number', hanzi: '分', pinyin: 'fēn', thai: 'นาที' },
+        { id: 'n25', category: 'number', hanzi: '半', pinyin: 'bàn', thai: 'ครึ่ง' },
+        { id: 'n26', category: 'number', hanzi: '小时', pinyin: 'xiǎo shí', thai: 'ชั่วโมง' },
+        { id: 'n27', category: 'number', hanzi: '星期一', pinyin: 'xīng qī yī', thai: 'วันจันทร์' },
+        { id: 'n28', category: 'number', hanzi: '星期二', pinyin: 'xīng qī èr', thai: 'วันอังคาร' },
+        { id: 'n29', category: 'number', hanzi: '星期三', pinyin: 'xīng qī sān', thai: 'วันพุธ' },
+        { id: 'n30', category: 'number', hanzi: '星期四', pinyin: 'xīng qī sì', thai: 'วันพฤหัสบดี' },
+        { id: 'n31', category: 'number', hanzi: '星期五', pinyin: 'xīng qī wǔ', thai: 'วันศุกร์' },
+        { id: 'n32', category: 'number', hanzi: '星期六', pinyin: 'xīng qī liù', thai: 'วันเสาร์' },
+        { id: 'n33', category: 'number', hanzi: '星期日', pinyin: 'xīng qī rì', thai: 'วันอาทิตย์' },
+        { id: 'n34', category: 'number', hanzi: '年', pinyin: 'nián', thai: 'ปี' },
+        { id: 'n35', category: 'number', hanzi: '月', pinyin: 'yuè', thai: 'เดือน' },
+        { id: 'n36', category: 'number', hanzi: '日', pinyin: 'rì', thai: 'วัน/วันที่' },
+        { id: 'n37', category: 'number', hanzi: '早上', pinyin: 'zǎo shang', thai: 'ตอนเช้า' },
+        { id: 'n38', category: 'number', hanzi: '中午', pinyin: 'zhōng wǔ', thai: 'ตอนเที่ยง' },
+        { id: 'n39', category: 'number', hanzi: '下午', pinyin: 'xià wǔ', thai: 'ตอนบ่าย' },
+        { id: 'n40', category: 'number', hanzi: '晚上', pinyin: 'wǎn shang', thai: 'ตอนกลางคืน' },
+        { id: 'n41', category: 'number', hanzi: '钱', pinyin: 'qián', thai: 'เงิน' },
+        { id: 'n42', category: 'number', hanzi: '块', pinyin: 'kuài', thai: 'หยวน (ภาษาพูด)' },
+        { id: 'n43', category: 'number', hanzi: '元', pinyin: 'yuán', thai: 'หยวน (ทางการ)' },
+        { id: 'n44', category: 'number', hanzi: '角', pinyin: 'jiǎo', thai: 'เฟื้อง (1/10 หยวน)' },
+        { id: 'n45', category: 'number', hanzi: '毛', pinyin: 'máo', thai: 'เฟื้อง (ภาษาพูด)' },
+        { id: 'n46', category: 'number', hanzi: '铢', pinyin: 'zhū', thai: 'บาท (สกุลเงินไทย)' },
+        { id: 'n47', category: 'number', hanzi: '一共', pinyin: 'yí gòng', thai: 'รวมทั้งหมด' },
+        { id: 'n48', category: 'number', hanzi: '零钱', pinyin: 'líng qián', thai: 'เงินทอน / เศษเงิน' },
+        { id: 'n49', category: 'number', hanzi: '打折', pinyin: 'dǎ zhé', thai: 'ลดราคา' },
+        { id: 'n50', category: 'number', hanzi: '免费', pinyin: 'miǎn fèi', thai: 'ฟรี' },
+
+        // ==========================================
+        // 3. หมวดชีวิตประจำวัน (Daily Life) - 50 คำ
+        // ==========================================
+        { id: 'd1', category: 'daily', hanzi: '吃饭', pinyin: 'chī fàn', thai: 'กินข้าว' },
+        { id: 'd2', category: 'daily', hanzi: '喝水', pinyin: 'hē shuǐ', thai: 'ดื่มน้ำ' },
+        { id: 'd3', category: 'daily', hanzi: '睡觉', pinyin: 'shuì jiào', thai: 'นอนหลับ' },
+        { id: 'd4', category: 'daily', hanzi: '起床', pinyin: 'qǐ chuáng', thai: 'ตื่นนอน' },
+        { id: 'd5', category: 'daily', hanzi: '刷牙', pinyin: 'shuā yá', thai: 'แปรงฟัน' },
+        { id: 'd6', category: 'daily', hanzi: '洗澡', pinyin: 'xǐ zǎo', thai: 'อาบน้ำ' },
+        { id: 'd7', category: 'daily', hanzi: '上班', pinyin: 'shàng bān', thai: 'ไปทำงาน' },
+        { id: 'd8', category: 'daily', hanzi: '下班', pinyin: 'xià bān', thai: 'เลิกงาน' },
+        { id: 'd9', category: 'daily', hanzi: '学习', pinyin: 'xué xí', thai: 'เรียนหนังสือ' },
+        { id: 'd10', category: 'daily', hanzi: '看书', pinyin: 'kàn shū', thai: 'อ่านหนังสือ' },
+        { id: 'd11', category: 'daily', hanzi: '看电视', pinyin: 'kàn diàn shì', thai: 'ดูทีวี' },
+        { id: 'd12', category: 'daily', hanzi: '听音乐', pinyin: 'tīng yīn yuè', thai: 'ฟังเพลง' },
+        { id: 'd13', category: 'daily', hanzi: '买东西', pinyin: 'mǎi dōng xi', thai: 'ซื้อของ' },
+        { id: 'd14', category: 'daily', hanzi: '做饭', pinyin: 'zuò fàn', thai: 'ทำอาหาร' },
+        { id: 'd15', category: 'daily', hanzi: '休息', pinyin: 'xiū xi', thai: 'พักผ่อน' },
+        { id: 'd16', category: 'daily', hanzi: '打手机', pinyin: 'dǎ shǒu jī', thai: 'เล่นมือถือ' },
+        { id: 'd17', category: 'daily', hanzi: '打电话', pinyin: 'dǎ diàn huà', thai: 'โทรศัพท์' },
+        { id: 'd18', category: 'daily', hanzi: '发微信', pinyin: 'fā wēi xìn', thai: 'ส่งวีแชต' },
+        { id: 'd19', category: 'daily', hanzi: '运动', pinyin: 'yùn dòng', thai: 'ออกกำลังกาย' },
+        { id: 'd20', category: 'daily', hanzi: '跑步', pinyin: 'pǎo bù', thai: 'วิ่ง' },
+        { id: 'd21', category: 'daily', hanzi: '家人', pinyin: 'jiā rén', thai: 'คนในครอบครัว' },
+        { id: 'd22', category: 'daily', hanzi: '爸爸', pinyin: 'bà ba', thai: 'พ่อ' },
+        { id: 'd23', category: 'daily', hanzi: '妈妈', pinyin: 'mā ma', thai: 'แม่' },
+        { id: 'd24', category: 'daily', hanzi: '哥哥', pinyin: 'gē ge', thai: 'พี่ชาย' },
+        { id: 'd25', category: 'daily', hanzi: '姐姐', pinyin: 'jiě jie', thai: 'พี่สาว' },
+        { id: 'd26', category: 'daily', hanzi: '弟弟', pinyin: 'dì di', thai: 'น้องชาย' },
+        { id: 'd27', category: 'daily', hanzi: '妹妹', pinyin: 'mèi mei', thai: 'น้องสาว' },
+        { id: 'd28', category: 'daily', hanzi: '朋友', pinyin: 'péng you', thai: 'เพื่อน' },
+        { id: 'd29', category: 'daily', hanzi: '老师', pinyin: 'lǎo shī', thai: 'คุณครู' },
+        { id: 'd30', category: 'daily', hanzi: '学生', pinyin: 'xué sheng', thai: 'นักเรียน' },
+        { id: 'd31', category: 'daily', hanzi: '同事', pinyin: 'tóng shì', thai: 'เพื่อนร่วมงาน' },
+        { id: 'd32', category: 'daily', hanzi: '衣服', pinyin: 'yī fu', thai: 'เสื้อผ้า' },
+        { id: 'd33', category: 'daily', hanzi: '鞋子', pinyin: 'xié zi', thai: 'รองเท้า' },
+        { id: 'd34', category: 'daily', hanzi: '包', pinyin: 'bāo', thai: 'กระเป๋า' },
+        { id: 'd35', category: 'daily', hanzi: '钱袋', pinyin: 'qián dài', thai: 'กระเป๋าสตางค์' },
+        { id: 'd36', category: 'daily', hanzi: '水杯', pinyin: 'shuǐ bēi', thai: 'แก้วน้ำ' },
+        { id: 'd37', category: 'daily', hanzi: '电脑', pinyin: 'diàn nǎo', thai: 'คอมพิวเตอร์' },
+        { id: 'd38', category: 'daily', hanzi: '钥匙', pinyin: 'yào shi', thai: 'กุญแจ' },
+        { id: 'd39', category: 'daily', hanzi: '开门', pinyin: 'kāi mén', thai: 'เปิดประตู' },
+        { id: 'd40', category: 'daily', hanzi: '关门', pinyin: 'guān mén', thai: 'ปิดประตู' },
+        { id: 'd41', category: 'daily', hanzi: '高兴', pinyin: 'gāo xìng', thai: 'ดีใจ / มีความสุข' },
+        { id: 'd42', category: 'daily', hanzi: '累', pinyin: 'lèi', thai: 'เหนื่อย' },
+        { id: 'd43', category: 'daily', hanzi: '饿', pinyin: 'è', thai: 'หิว' },
+        { id: 'd44', category: 'daily', hanzi: '渴', pinyin: 'kě', thai: 'กระหายน้ำ' },
+        { id: 'd45', category: 'daily', hanzi: '忙', pinyin: 'máng', thai: 'ยุ่ง' },
+        { id: 'd46', category: 'daily', hanzi: '生病', pinyin: 'shēng bìng', thai: 'ป่วย' },
+        { id: 'd47', category: 'daily', hanzi: '吃药', pinyin: 'chī yào', thai: 'กินยา' },
+        { id: 'd48', category: 'daily', hanzi: '天气', pinyin: 'tiān qì', thai: 'อากาศ' },
+        { id: 'd49', category: 'daily', hanzi: '热', pinyin: 'rè', thai: 'ร้อน' },
+        { id: 'd50', category: 'daily', hanzi: '冷', pinyin: 'lěng', thai: 'หนาว' },
+
+        // ==========================================
+        // 4. หมวดอาหาร เครื่องดื่ม (Food) - 50 คำ
+        // ==========================================
+        { id: 'f1', category: 'food', hanzi: '米饭', pinyin: 'mǐ fàn', thai: 'ข้าวสวย' },
+        { id: 'f2', category: 'food', hanzi: '炒饭', pinyin: 'chǎo fàn', thai: 'ข้าวผัด' },
+        { id: 'f3', category: 'food', hanzi: '面条', pinyin: 'miàn tiáo', thai: 'ก๋วยเตี๋ยว/บะหมี่' },
+        { id: 'f4', category: 'food', hanzi: '包子', pinyin: 'bāo zi', thai: 'ซาลาเปา' },
+        { id: 'f5', category: 'food', hanzi: '饺子', pinyin: 'jiǎo zi', thai: 'เกี๊ยว' },
+        { id: 'f6', category: 'food', hanzi: '面包', pinyin: 'miàn bāo', thai: 'ขนมปัง' },
+        { id: 'f7', category: 'food', hanzi: '鸡蛋', pinyin: 'jī dàn', thai: 'ไข่ไก่' },
+        { id: 'f8', category: 'food', hanzi: '猪肉', pinyin: 'zhū ròu', thai: 'เนื้อหมู' },
+        { id: 'f9', category: 'food', hanzi: '牛肉', pinyin: 'niú ròu', thai: 'เนื้อวัว' },
+        { id: 'f10', category: 'food', hanzi: '鸡肉', pinyin: 'jī ròu', thai: 'เนื้อไก่' },
+        { id: 'f11', category: 'food', hanzi: '鱼', pinyin: 'yú', thai: 'ปลา' },
+        { id: 'f12', category: 'food', hanzi: '虾', pinyin: 'xiā', thai: 'กุ้ง' },
+        { id: 'f13', category: 'food', hanzi: '蔬菜', pinyin: 'shū cài', thai: 'ผัก' },
+        { id: 'f14', category: 'food', hanzi: '汤', pinyin: 'tāng', thai: 'น้ำซุป' },
+        { id: 'f15', category: 'food', hanzi: '火锅', pinyin: 'huǒ guō', thai: 'ชาบู / หม้อไฟ' },
+        { id: 'f16', category: 'food', hanzi: '麻辣烫', pinyin: 'má là tàng', thai: 'หม่าล่าทั่ง' },
+        { id: 'f17', category: 'food', hanzi: '水', pinyin: 'shuǐ', thai: 'น้ำเปล่า' },
+        { id: 'f18', category: 'food', hanzi: '热水', pinyin: 'rè shuǐ', thai: 'น้ำร้อน' },
+        { id: 'f19', category: 'food', hanzi: '冰水', pinyin: 'bīng shuǐ', thai: 'น้ำเย็น' },
+        { id: 'f20', category: 'food', hanzi: '茶', pinyin: 'chá', thai: 'ชา' },
+        { id: 'f21', category: 'food', hanzi: '绿茶', pinyin: 'lǜ chá', thai: 'ชาเขียว' },
+        { id: 'f22', category: 'food', hanzi: '咖啡', pinyin: 'kā fēi', thai: 'กาแฟ' },
+        { id: 'f23', category: 'food', hanzi: '牛奶', pinyin: 'niú nǎi', thai: 'นมสด' },
+        { id: 'f24', category: 'food', hanzi: '可乐', pinyin: 'kě lè', thai: 'โค้ก' },
+        { id: 'f25', category: 'food', hanzi: '果汁', pinyin: 'guǒ zhī', thai: 'น้ำผลไม้' },
+        { id: 'f26', category: 'food', hanzi: '啤酒', pinyin: 'pí jiǔ', thai: 'เบียร์' },
+        { id: 'f27', category: 'food', hanzi: '奶茶', pinyin: 'nǎi chá', thai: 'ชานม' },
+        { id: 'f28', category: 'food', hanzi: '水果', pinyin: 'shuǐ guǒ', thai: 'ผลไม้' },
+        { id: 'f29', category: 'food', hanzi: '苹果', pinyin: 'píng guǒ', thai: 'แอปเปิ้ล' },
+        { id: 'f30', category: 'food', hanzi: '香蕉', pinyin: 'xiāng jiāo', thai: 'กล้วย' },
+        { id: 'f31', category: 'food', hanzi: '西瓜', pinyin: 'xī guā', thai: 'แตงโม' },
+        { id: 'f32', category: 'food', hanzi: '芒果', pinyin: 'máng guǒ', thai: 'มะม่วง' },
+        { id: 'f33', category: 'food', hanzi: '好吃', pinyin: 'hǎo chī', thai: 'อร่อย' },
+        { id: 'f34', category: 'food', hanzi: '好喝', pinyin: 'hǎo hē', thai: 'อร่อย (เครื่องดื่ม)' },
+        { id: 'f35', category: 'food', hanzi: '辣', pinyin: 'là', thai: 'เผ็ด' },
+        { id: 'f36', category: 'food', hanzi: '不辣', pinyin: 'bú là', thai: 'ไม่เผ็ด' },
+        { id: 'f37', category: 'food', hanzi: '甜', pinyin: 'tián', thai: 'หวาน' },
+        { id: 'f38', category: 'food', hanzi: '咸', pinyin: 'xián', thai: 'เค็ม' },
+        { id: 'f39', category: 'food', hanzi: '酸', pinyin: 'suān', thai: 'เปรี้ยว' },
+        { id: 'f40', category: 'food', hanzi: '苦', pinyin: 'kǔ', thai: 'ขม' },
+        { id: 'f41', category: 'food', hanzi: '菜单', pinyin: 'cài dān', thai: 'เมนู' },
+        { id: 'f42', category: 'food', hanzi: '点菜', pinyin: 'diǎn cài', thai: 'สั่งอาหาร' },
+        { id: 'f43', category: 'food', hanzi: '买单', pinyin: 'mǎi dān', thai: 'เช็คบิล' },
+        { id: 'f44', category: 'food', hanzi: '结账', pinyin: 'jié zhàng', thai: 'คิดเงิน' },
+        { id: 'f45', category: 'food', hanzi: '打包', pinyin: 'dǎ bāo', thai: 'ห่อกลับบ้าน' },
+        { id: 'f46', category: 'food', hanzi: '筷子', pinyin: 'kuài zi', thai: 'ตะเกียบ' },
+        { id: 'f47', category: 'food', hanzi: '勺子', pinyin: 'sháo zi', thai: 'ช้อน' },
+        { id: 'f48', category: 'food', hanzi: '碗', pinyin: 'wǎn', thai: 'ชาม' },
+        { id: 'f49', category: 'food', hanzi: '盘子', pinyin: 'pán zi', thai: 'จาน' },
+        { id: 'f50', category: 'food', hanzi: '纸巾', pinyin: 'zhǐ jīn', thai: 'ทิชชู่' },
+
+        // ==========================================
+        // 5. หมวดการเดินทาง & ท่องเที่ยว (Travel) - 50 คำ
+        // ==========================================
+        { id: 't1', category: 'travel', hanzi: '机场', pinyin: 'jī chǎng', thai: 'สนามบิน' },
+        { id: 't2', category: 'travel', hanzi: '火车站', pinyin: 'huǒ chē zhàn', thai: 'สถานีรถไฟ' },
+        { id: 't3', category: 'travel', hanzi: '地铁站', pinyin: 'dì tiě zhàn', thai: 'สถานีรถไฟฟ้าใต้ดิน' },
+        { id: 't4', category: 'travel', hanzi: '公交车站', pinyin: 'gōng jiāo chē zhàn', thai: 'ป้ายรถเมล์' },
+        { id: 't5', category: 'travel', hanzi: '酒店', pinyin: 'jiǔ diàn', thai: 'โรงแรม' },
+        { id: 't6', category: 'travel', hanzi: '饭店', pinyin: 'fàn diàn', thai: 'ร้านอาหาร / โรงแรม' },
+        { id: 't7', category: 'travel', hanzi: '商店', pinyin: 'shāng diàn', thai: 'ร้านค้า' },
+        { id: 't8', category: 'travel', hanzi: '超市', pinyin: 'chāo shì', thai: 'ซูเปอร์มาร์เก็ต' },
+        { id: 't9', category: 'travel', hanzi: '医院', pinyin: 'yī yuàn', thai: 'โรงพยาบาล' },
+        { id: 't10', category: 'travel', hanzi: '药店', pinyin: 'yào diàn', thai: 'ร้านขายยา' },
+        { id: 't11', category: 'travel', hanzi: '洗手间', pinyin: 'xǐ shǒu jiān', thai: 'ห้องน้ำ' },
+        { id: 't12', category: 'travel', hanzi: '厕所', pinyin: 'cè suǒ', thai: 'ส้วม / ห้องน้ำ' },
+        { id: 't13', category: 'travel', hanzi: '出租车', pinyin: 'chū zū chē', thai: 'รถแท็กซี่' },
+        { id: 't14', category: 'travel', hanzi: '飞机', pinyin: 'fēi jī', thai: 'เครื่องบิน' },
+        { id: 't15', category: 'travel', hanzi: '火车', pinyin: 'huǒ chē', thai: 'รถไฟ' },
+        { id: 't16', category: 'travel', hanzi: '高铁', pinyin: 'gāo tiě', thai: 'รถไฟความเร็วสูง' },
+        { id: 't17', category: 'travel', hanzi: '公共汽车', pinyin: 'gōng gòng qì chē', thai: 'รถประจำทาง' },
+        { id: 't18', category: 'travel', hanzi: '自行车', pinyin: 'zì xíng chē', thai: 'รถจักรยาน' },
+        { id: 't19', category: 'travel', hanzi: '护照', pinyin: 'hù zhào', thai: 'หนังสือเดินทาง' },
+        { id: 't20', category: 'travel', hanzi: '签证', pinyin: 'qiān zhèng', thai: 'วีซ่า' },
+        { id: 't21', category: 'travel', hanzi: '机票', pinyin: 'jī piào', thai: 'ตั๋วเครื่องบิน' },
+        { id: 't22', category: 'travel', hanzi: '车票', pinyin: 'chē piào', thai: 'ตั๋วรถ' },
+        { id: 't23', category: 'travel', hanzi: '门票', pinyin: 'mén piào', thai: 'ตั๋วเข้าชม' },
+        { id: 't24', category: 'travel', hanzi: '行李', pinyin: 'xíng li', thai: 'กระเป๋าเดินทาง' },
+        { id: 't25', category: 'travel', hanzi: '地图', pinyin: 'dì tú', thai: 'แผนที่' },
+        { id: 't26', category: 'travel', hanzi: '在哪里', pinyin: 'zài nǎ lǐ', thai: 'อยู่ที่ไหน' },
+        { id: 't27', category: 'travel', hanzi: '怎么走', pinyin: 'zěn me zǒu', thai: 'ไปยังไง' },
+        { id: 't28', category: 'travel', hanzi: '直走', pinyin: 'zhí zǒu', thai: 'ตรงไป' },
+        { id: 't29', category: 'travel', hanzi: '左转', pinyin: 'zuǒ zhuǎn', thai: 'เลี้ยวซ้าย' },
+        { id: 't30', category: 'travel', hanzi: '右转', pinyin: 'yòu zhuǎn', thai: 'เลี้ยวขวา' },
+        { id: 't31', category: 'travel', hanzi: '前', pinyin: 'qián', thai: 'ข้างหน้า' },
+        { id: 't32', category: 'travel', hanzi: '后', pinyin: 'hòu', thai: 'ข้างหลัง' },
+        { id: 't33', category: 'travel', hanzi: '左', pinyin: 'zuǒ', thai: 'ซ้าย' },
+        { id: 't34', category: 'travel', hanzi: '右', pinyin: 'yòu', thai: 'ขวา' },
+        { id: 't35', category: 'travel', hanzi: '近', pinyin: 'jìn', thai: 'ใกล้' },
+        { id: 't36', category: 'travel', hanzi: '远', pinyin: 'yuǎn', thai: 'ไกล' },
+        { id: 't37', category: 'travel', hanzi: '多少钱', pinyin: 'duō shao qián', thai: 'ราคาเท่าไหร่' },
+        { id: 't38', category: 'travel', hanzi: '太贵了', pinyin: 'tài guì le', thai: 'แพงเกินไปแล้ว' },
+        { id: 't39', category: 'travel', hanzi: '便宜一点', pinyin: 'pián yi yì diǎn', thai: 'ลดราคาหน่อยได้ไหม' },
+        { id: 't40', category: 'travel', hanzi: '拍照', pinyin: 'pāi zhào', thai: 'ถ่ายรูป' },
+        { id: 't41', category: 'travel', hanzi: '帮助', pinyin: 'bāng zhù', thai: 'ช่วยเหลือ' },
+        { id: 't42', category: 'travel', hanzi: '迷路', pinyin: 'mí lù', thai: 'หลงทาง' },
+        { id: 't43', category: 'travel', hanzi: '危险', pinyin: 'wēi xiǎn', thai: 'อันตราย' },
+        { id: 't44', category: 'travel', hanzi: '安全', pinyin: 'ān quán', thai: 'ปลอดภัย' },
+        { id: 't45', category: 'travel', hanzi: '买', pinyin: 'mǎi', thai: 'ซื้อ' },
+        { id: 't46', category: 'travel', hanzi: '卖', pinyin: 'mài', thai: 'ขาย' },
+        { id: 't47', category: 'travel', hanzi: '刷卡', pinyin: 'shuā kǎ', thai: 'รูดบัตร' },
+        { id: 't48', category: 'travel', hanzi: '现金', pinyin: 'xiàn jīn', thai: 'เงินสด' },
+        { id: 'f49', category: 'travel', hanzi: '扫码', pinyin: 'sǎo mǎ', thai: 'สแกนคิวอาร์โค้ด' },
+        { id: 't50', category: 'travel', hanzi: '支付宝', pinyin: 'zhī fù bǎo', thai: 'Alipay (อลิเพย์)' },
+      ];
+      // ใช้ไอคอนแบบ Inline SVG / Emoji ปลอดภัย ไม่ชนกับ React
+        const TABS = [
+          { 
+            key: 'learn', 
+            label: 'เรียนรู้', 
+            hanzi: '学习', 
+            icon: (props) => (
+              <svg width={props.size || 16} height={props.size || 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              </svg>
+            ) 
+          },
+          { 
+            key: 'listen', 
+            label: 'ฝึกพูด', 
+            hanzi: '听说', 
+            icon: (props) => (
+              <svg width={props.size || 16} height={props.size || 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+            ) 
+          },
+          { 
+            key: 'quiz', 
+            label: 'ควิซ', 
+            hanzi: '测验', 
+            icon: (props) => (
+              <svg width={props.size || 16} height={props.size || 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+            ) 
+          },
+          { 
+            key: 'chat', 
+            label: 'สนทนา', 
+            hanzi: '对话', 
+            icon: (props) => (
+              <svg width={props.size || 16} height={props.size || 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+            ) 
+          },
+        ];
+
+      const SYSTEM_PROMPT = `คุณคือ "ครูหนิง" ติวเตอร์ภาษาจีนกลางใจดีสำหรับผู้เรียนชาวไทยระดับเริ่มต้น-กลาง
+กติกา:
+- ผู้เรียนจะพิมพ์ข้อความเป็นภาษาไทยหรือภาษาจีน
+- ตอบกลับเป็น "JSON เท่านั้น" ห้ามมีข้อความอื่นนอก JSON ห้ามใส่ backtick หรือคำนำ
+- รูปแบบ JSON: {"hanzi":"ประโยคภาษาจีนสั้นๆที่ใช้สนทนาต่อ","pinyin":"พินอินพร้อมวรรณยุกต์ของประโยคนั้น","thai":"คำแปลภาษาไทยของประโยคนั้น","note":"ถ้าผู้เรียนพิมพ์ภาษาจีนมาและมีจุดผิด ให้อธิบายสั้นๆเป็นภาษาไทยว่าผิดตรงไหนควรพูดอย่างไร ถ้าไม่มีข้อผิดพลาดหรือผู้เรียนพิมพ์ไทยมา ให้ใส่ค่าว่าง"}
+- ประโยคภาษาจีนควรสั้น เป็นธรรมชาติ เหมาะกับผู้เริ่มต้น ใช้คำศัพท์พื้นฐาน
+- ให้กำลังใจ เป็นกันเอง เหมือนครูที่อบอุ่น`;
+      function shuffle(arr) {
+        var a = arr.slice();
+        for (var i = a.length - 1; i > 0; i--) {
+          var j = Math.floor(Math.random() * (i + 1));
+          var temp = a[i];
+          a[i] = a[j];
+          a[j] = temp;
+        }
+        return a;
+      }
+
+      function normalizeHanzi(s) {
+        return (s || '').replace(/[，。！？、\s,.!?]/g, '');
+      }
+
+      function SpeakButton({ text, size = 18, onSpeak }) {
+        return (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              if (typeof onSpeak === 'function') {
+                onSpeak(text);
+              }
+            }}
+            style={{
+              width: size + 22, height: size + 22, borderRadius: '999px',
+              border: `1px solid ${COLORS.line || '#ccc'}`, background: COLORS.paper || '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: COLORS.seal || '#333', cursor: 'pointer', flexShrink: 0,
+              transition: 'background 150ms ease, transform 100ms ease',
+            }}
+            aria-label="ฟังเสียง"
+          >
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+          </button>
+        );
+      }
+
+      function ChineseSpeakingTutor() {
+        const [tab, setTab] = useState('learn');
+        const [voices, setVoices] = useState([]);
+
+        // 1. โหลดรายการเสียง (Voices) มารอไว้ใน State
+        useEffect(() => {
+          if (!('speechSynthesis' in window)) return;
+
+          const updateVoices = () => {
+            const availableVoices = window.speechSynthesis.getVoices();
+            if (availableVoices.length > 0) {
+              setVoices(availableVoices);
+            }
+          };
+
+          updateVoices();
+          window.speechSynthesis.onvoiceschanged = updateVoices;
+
+          return () => {
+            window.speechSynthesis.onvoiceschanged = null;
+          };
+        }, []);
+
+        // 2. ฟังก์ชัน speak ที่ดึงเสียงจาก State และรองรับการสั่งพูดซ้ำ
+        const speak = useCallback((text, rate = 0.88) => {
+          if (!('speechSynthesis' in window) || !text) return;
+
+          // ยกเลิกคิวเสียงเก่า
+          window.speechSynthesis.cancel();
+
+          // สร้าง Utterance ใหม่
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = 'zh-CN';
+          u.rate = rate;
+
+          // ค้นหาเสียงภาษาจีน (zh-CN, zh-TW, zh-HK)
+          const currentVoices = voices.length > 0 ? voices : window.speechSynthesis.getVoices();
+          const zh = currentVoices.find((v) => 
+            v.lang && (v.lang.toLowerCase().includes('zh') || v.lang.toLowerCase().includes('cn'))
+          );
+
+          if (zh) {
+            u.voice = zh;
+          }
+
+          // แก้ปัญหา Chrome บล็อกเสียงถ้าไม่มี Interaction หรือสั่งพูดยาว
+          setTimeout(() => {
+            window.speechSynthesis.speak(u);
+          }, 50);
+        }, [voices]);
+
+        return (
+          <div style={{
+            fontFamily: "'Noto Sans Thai','Noto Sans',sans-serif",
+            background: COLORS.paper, color: COLORS.ink,
+            minHeight: '100vh', width: '100%', boxSizing: 'border-box',
+            padding: '20px 16px 40px',
+          }}>
+            <Header />
+            <TabBar tab={tab} setTab={setTab} />
+
+            <div style={{ maxWidth: 720, margin: '28px auto 0' }}>
+              {tab === 'learn' && <LearnTab speak={speak} />}
+              {tab === 'listen' && <ListenTab speak={speak} />}
+              {tab === 'quiz' && <QuizTab speak={speak} />}
+              {tab === 'chat' && <ChatTab speak={speak} />}
+            </div>
+          </div>
+        );
+      }
+
+      function Header() {
+        return (
+          <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{
+              width: 52, height: 52, background: COLORS.seal, color: '#F6E9E4',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: "'Noto Serif SC', serif", fontSize: 22, fontWeight: 700,
+              transform: 'rotate(-3deg)', flexShrink: 0, borderRadius: 4,
+            }} className="csp-hanzi">话</div>
+            <div>
+              <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.3, fontWeight: 700 }}>
+                学说话 <span style={{ fontWeight: 500, fontSize: 15, color: COLORS.inkSoft }}>· ฝึกพูดภาษาจีนกับครูหนิง</span>
+              </h1>
+              <p style={{ margin: '2px 0 0', fontSize: 13, color: COLORS.inkSoft }}>
+                เรียนคำศัพท์ ฝึกออกเสียง ทำแบบทดสอบ และสนทนากับ AI
+              </p>
+            </div>
+          </div>
+        );
+      }
+
+      function TabBar({ tab, setTab }) {
+        return (
+          <div style={{
+            maxWidth: 720, margin: '22px auto 0', display: 'flex', gap: 6,
+            borderBottom: `1px solid ${COLORS.line}`, overflowX: 'auto',
+          }} className="csp-scroll">
+            {TABS.map((t) => {
+              const Icon = t.icon;
+              const active = tab === t.key;
+              return (
+                <button
+                  type="button"
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 7,
+                    padding: '10px 14px', background: 'transparent', border: 'none',
+                    borderBottom: active ? `2px solid ${COLORS.seal}` : '2px solid transparent',
+                    color: active ? COLORS.ink : COLORS.inkSoft,
+                    fontWeight: active ? 600 : 500, fontSize: 14, cursor: 'pointer',
+                    whiteSpace: 'nowrap', marginBottom: -1,
+                  }}
+                >
+                  <Icon size={16} />
+                  {t.label}
+                  <span className="csp-hanzi" style={{ fontSize: 13, color: COLORS.gold }}>{t.hanzi}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      }
+
+      function CategoryChips({ value, onChange }) {
+        return (
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }} className="csp-scroll">
+            {CATEGORIES.map((c) => {
+              const active = value === c.key;
+              return (
+                <button
+                  type="button"
+                  key={c.key}
+                  onClick={() => onChange(c.key)}
+                  style={{
+                    padding: '8px 14px', borderRadius: 8, whiteSpace: 'nowrap',
+                    border: `1px solid ${active ? COLORS.seal : COLORS.line}`,
+                    background: active ? COLORS.seal : COLORS.paper,
+                    color: active ? '#F6E9E4' : COLORS.ink,
+                    fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}
+                >
+                  {c.label} <span className="csp-hanzi" style={{ opacity: 0.85 }}>{c.hanzi}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      }
+
+      function LearnTab({ speak }) {
+        const [cat, setCat] = useState('greeting');
+        const items = VOCAB.filter((v) => v.category === cat);
+        return (
+          <div>
+            <CategoryChips value={cat} onChange={setCat} />
+            <div style={{
+              marginTop: 18, display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12,
+            }}>
+              {items.map((v) => (
+                <div key={v.id} style={{
+                  border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: '16px 14px',
+                  background: COLORS.paperDark, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', gap: 6, textAlign: 'center',
+                }}>
+                  <div className="csp-hanzi" style={{ fontSize: 30, fontWeight: 700 }}>{v.hanzi}</div>
+                  <div style={{ fontSize: 13.5, color: COLORS.gold, fontStyle: 'italic' }}>{v.pinyin}</div>
+                  <div style={{ fontSize: 13.5, color: COLORS.ink }}>{v.thai}</div>
+                  <div style={{ marginTop: 4 }}>
+                    <SpeakButton text={v.hanzi} size={15} onSpeak={speak} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      function ListenTab({ speak }) {
+        const [cat, setCat] = useState('greeting');
+        const items = VOCAB.filter((v) => v.category === cat);
+        const [idx, setIdx] = useState(0);
+        const [micState, setMicState] = useState('idle');
+        const [transcript, setTranscript] = useState('');
+        const recRef = useRef(null);
+        const current = items[idx] || items[0];
+
+        useEffect(() => { setIdx(0); setMicState('idle'); setTranscript(''); }, [cat]);
+
+        function startListening() {
+          const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+          if (!SR) { 
+            setMicState('unsupported'); 
+            return; 
+          }
+
+          // หากมีการอัดเสียงค้างอยู่ ให้สั่งหยุดก่อนเปิดใหม่
+          if (recRef.current) {
+            try { recRef.current.abort(); } catch (e) {}
+          }
+
+          try {
+            const rec = new SR();
+            rec.lang = 'zh-CN';
+            rec.interimResults = false;
+            rec.maxAlternatives = 3;
+            recRef.current = rec;
+
+            setTranscript('');
+            
+            rec.onstart = () => {
+              setMicState('listening');
+            };
+
+            rec.onresult = (e) => {
+              if (!e.results || !e.results[0]) return;
+              
+              const alts = Array.from(e.results[0]).map((r) => r.transcript);
+              const spokenText = alts[0] || '';
+              setTranscript(spokenText);
+
+              // ตรวจสอบความถูกต้องของคำศัพท์
+              const target = normalizeHanzi(current.hanzi);
+              const hit = alts.some((a) => {
+                const norm = normalizeHanzi(a);
+                return norm.includes(target) || target.includes(norm);
+              });
+
+              setMicState(hit ? 'correct' : 'wrong');
+            };
+
+            rec.onerror = (e) => {
+              console.error('Speech recognition error:', e.error);
+              
+              if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+                setMicState('denied');
+                alert(
+                  'ระบบถูกจำกัดการเข้าถึงไมโครโฟนจาก Google Apps Script Frame\n\n' +
+                  'วิธีแก้ไข:\n' +
+                  '1. หากเปิดในหน้าแก้ไข ให้ใช้ลิงก์ Web App (URL ที่ลงท้ายด้วย /exec)\n' +
+                  '2. ตรวจสอบว่าไม่ได้เปิดในโหมดไม่ระบุตัวตน (Incognito Mode)'
+                );
+              } else {
+                setMicState('wrong');
+              }
+            };
+
+            rec.onend = () => {
+              // คืนค่าเป็น idle เฉพาะเมื่อยังฟังไม่เสร็จหรือไม่ได้ผลลัพธ์
+              setMicState((p) => (p === 'listening' ? 'idle' : p));
+            };
+
+            rec.start();
+          } catch (err) {
+            console.error('Mic start error:', err);
+            setMicState('unsupported');
+          }
+        }
+
+        function stopListening() {
+          if (recRef.current) recRef.current.stop();
+        }
+
+        function next(delta) {
+          setMicState('idle'); setTranscript('');
+          setIdx((i) => (i + delta + items.length) % items.length);
+        }
+
+        if (!current) return null;
+
+        const feedback = {
+          idle: { text: 'กดปุ่มไมค์แล้วลองพูดตามคำนี้ดูนะ', color: COLORS.inkSoft },
+          listening: { text: 'กำลังฟัง... พูดได้เลย', color: COLORS.gold },
+          correct: { text: 'เยี่ยมมาก! ออกเสียงถูกต้อง 👏', color: COLORS.bamboo },
+          wrong: { text: `ยังไม่ตรงนัก ลองอีกครั้งนะ (ได้ยินว่า: ${transcript || '...'})`, color: COLORS.seal },
+          denied: { text: 'ไม่สามารถเข้าถึงไมโครโฟนได้ ลองฟังแล้วฝึกพูดตามด้วยตัวเองแทนนะ', color: COLORS.seal },
+          unsupported: { text: 'เบราว์เซอร์นี้ไม่รองรับการฟังเสียงพูด ลองฟังแล้วฝึกพูดตามด้วยตัวเองแทนนะ', color: COLORS.seal },
+        }[micState];
+
+        return (
+          <div>
+            <CategoryChips value={cat} onChange={setCat} />
+            <div style={{
+              marginTop: 18, border: `1px solid ${COLORS.line}`, borderRadius: 10,
+              background: COLORS.paperDark, padding: '32px 20px', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 13, color: COLORS.inkSoft, marginBottom: 6 }}>
+                คำที่ {idx + 1} / {items.length}
+              </div>
+              <div className="csp-hanzi" style={{ fontSize: 48, fontWeight: 700 }}>{current.hanzi}</div>
+              <div style={{ fontSize: 16, color: COLORS.gold, fontStyle: 'italic', marginTop: 4 }}>{current.pinyin}</div>
+              <div style={{ fontSize: 15, marginTop: 4 }}>{current.thai}</div>
+
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 22 }}>
+                <button type="button" onClick={() => speak(current.hanzi)} style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px',
+                  borderRadius: 999, border: `1px solid ${COLORS.line}`, background: COLORS.paper,
+                  color: COLORS.ink, fontWeight: 600, fontSize: 14, cursor: 'pointer',
+                  }}>
+                    <span style={{ fontSize: 16 }}>🔊</span> ฟัง
+                </button>
+                <button
+                  type="button"
+                  onClick={micState === 'listening' ? stopListening : startListening}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px',
+                    borderRadius: 999, border: 'none',
+                    background: micState === 'listening' ? COLORS.seal : COLORS.bamboo,
+                    color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+                  }}
+                >
+                  {micState === 'listening' ? <Square size={16} /> : <Mic size={16} />}
+                  {micState === 'listening' ? 'หยุด' : 'พูดตาม'}
+                </button>
+              </div>
+
+              <div style={{ marginTop: 16, fontSize: 13.5, color: feedback.color, minHeight: 20 }}>
+                {feedback.text}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14 }}>
+              <button type="button" onClick={() => next(-1)} style={navBtnStyle}>
+                <ChevronLeft size={16} /> ก่อนหน้า
+              </button>
+              <button type="button" onClick={() => next(1)} style={navBtnStyle}>
+                ถัดไป <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      const navBtnStyle = {
+        display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+        borderRadius: 8, border: `1px solid ${COLORS.line}`, background: COLORS.paper,
+        color: COLORS.ink, fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
+      };
+
+      function buildQuiz(catKey) {
+        const pool = VOCAB.filter((v) => v.category === catKey);
+        const qCount = Math.min(8, pool.length);
+        return shuffle(pool).slice(0, qCount).map((item) => {
+          const direction = Math.random() < 0.5 ? 'toThai' : 'toHanzi';
+          const distractors = shuffle(pool.filter((v) => v.id !== item.id)).slice(0, 3);
+          const options = shuffle([item, ...distractors]);
+          return { item, direction, options };
+        });
+      }
+
+      function QuizTab({ speak }) {
+        const [cat, setCat] = useState('greeting');
+        const [questions, setQuestions] = useState(() => buildQuiz('greeting'));
+        const [qi, setQi] = useState(0);
+        const [score, setScore] = useState(0);
+        const [selected, setSelected] = useState(null);
+        const [done, setDone] = useState(false);
+
+        function restart(newCat) {
+          const c = newCat || cat;
+          setCat(c);
+          setQuestions(buildQuiz(c));
+          setQi(0); setScore(0); setSelected(null); setDone(false);
+        }
+
+        const q = questions[qi];
+
+        function choose(opt) {
+          if (selected) return;
+          setSelected(opt.id);
+          if (opt.id === q.item.id) setScore((s) => s + 1);
+        }
+
+        function nextQuestion() {
+          if (qi + 1 >= questions.length) { setDone(true); return; }
+          setQi((i) => i + 1);
+          setSelected(null);
+        }
+
+        if (done) {
+          return (
+            <div style={{
+              border: `1px solid ${COLORS.line}`, borderRadius: 10, background: COLORS.paperDark,
+              padding: '36px 20px', textAlign: 'center',
+            }}>
+              <Sparkles size={28} color={COLORS.gold} style={{ marginBottom: 8 }} />
+              <div style={{ fontSize: 20, fontWeight: 700 }}>ทำเสร็จแล้ว!</div>
+              <div style={{ fontSize: 15, color: COLORS.inkSoft, marginTop: 6 }}>
+                คะแนนของคุณ: <b style={{ color: COLORS.ink }}>{score} / {questions.length}</b>
+              </div>
+              <button type="button" onClick={() => restart()} style={{
+                marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '10px 20px', borderRadius: 999, border: 'none',
+                background: COLORS.seal, color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+              }}>
+                <RefreshCw size={16} /> ทำอีกครั้ง
+              </button>
+            </div>
+          );
+        }
+
+        if (!q) return null;
+
+        const promptHanzi = q.direction === 'toThai' ? q.item.hanzi : null;
+        const promptPinyin = q.direction === 'toThai' ? q.item.pinyin : null;
+        const promptThai = q.direction === 'toHanzi' ? q.item.thai : null;
+
+        return (
+          <div>
+            <CategoryChips value={cat} onChange={(c) => restart(c)} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '16px 0 10px' }}>
+              <span style={{ fontSize: 13, color: COLORS.inkSoft }}>ข้อ {qi + 1} / {questions.length}</span>
+              <span style={{ fontSize: 13, color: COLORS.inkSoft }}>คะแนน {score}</span>
+            </div>
+
+            <div style={{
+              border: `1px solid ${COLORS.line}`, borderRadius: 10, background: COLORS.paperDark,
+              padding: '28px 20px', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 13, color: COLORS.inkSoft, marginBottom: 10 }}>
+                {q.direction === 'toThai' ? 'คำนี้แปลว่าอะไร?' : 'คำนี้เขียนแบบใด?'}
+              </div>
+              {q.direction === 'toThai' ? (
+                <>
+                  <div className="csp-hanzi" style={{ fontSize: 40, fontWeight: 700 }}>{promptHanzi}</div>
+                  <div style={{ fontSize: 15, color: COLORS.gold, fontStyle: 'italic', marginTop: 4 }}>{promptPinyin}</div>
+                  <div style={{ marginTop: 10 }}>
+                    <SpeakButton text={promptHanzi} size={16} onSpeak={speak} />
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 22, fontWeight: 700 }}>{promptThai}</div>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
+              {q.options.map((opt) => {
+                const isCorrect = opt.id === q.item.id;
+                const isChosen = selected === opt.id;
+                let bg = COLORS.paper, border = COLORS.line, color = COLORS.ink;
+                if (selected) {
+                  if (isCorrect) { bg = COLORS.bambooSoft; border = COLORS.bamboo; }
+                  else if (isChosen) { bg = COLORS.sealSoft; border = COLORS.seal; }
+                }
+                return (
+                  <button
+                    type="button"
+                    key={opt.id}
+                    className="csp-opt"
+                    onClick={() => choose(opt)}
+                    style={{
+                      border: `1.5px solid ${border}`, background: bg, color,
+                      borderRadius: 8, padding: '14px 10px', fontSize: 15,
+                      cursor: selected ? 'default' : 'pointer', display: 'flex',
+                      flexDirection: 'column', alignItems: 'center', gap: 3,
+                      animation: selected && (isCorrect || isChosen) ? 'csp-pop 150ms ease' : 'none',
+                    }}
+                  >
+                    {q.direction === 'toThai' ? (
+                      <span>{opt.thai}</span>
+                    ) : (
+                      <>
+                        <span className="csp-hanzi" style={{ fontSize: 22, fontWeight: 700 }}>{opt.hanzi}</span>
+                        <span style={{ fontSize: 12, color: COLORS.gold, fontStyle: 'italic' }}>{opt.pinyin}</span>
+                      </>
+                    )}
+                    {selected && isCorrect && <Check size={14} color={COLORS.bamboo} />}
+                    {selected && isChosen && !isCorrect && <X size={14} color={COLORS.seal} />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {selected && (
+              <button type="button" onClick={nextQuestion} style={{
+                marginTop: 16, width: '100%', padding: '12px', borderRadius: 8, border: 'none',
+                background: COLORS.ink, color: COLORS.paper, fontWeight: 600, fontSize: 14.5, cursor: 'pointer',
+              }}>
+                {qi + 1 >= questions.length ? 'ดูผลคะแนน' : 'ข้อถัดไป'}
+              </button>
+            )}
+          </div>
+        );
+      }
+
+      const STARTERS = ['你好！我叫...', 'ขอบคุณมากค่ะ', 'ฉันหิวข้าว', '多少钱？'];
+
+      function ChatTab({ speak }) {
+        const [messages, setMessages] = useState([
+          { role: 'assistant', hanzi: '你好！我是林老师，很高兴认识你。', pinyin: 'nǐ hǎo! wǒ shì lín lǎoshī, hěn gāoxìng rènshi nǐ.', thai: 'สวัสดี! ฉันคือครูหลิน ยินดีที่ได้รู้จักนะ', note: '' },
+        ]);
+        const [input, setInput] = useState('');
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState('');
+        const scrollRef = useRef(null);
+
+        useEffect(() => {
+          if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }, [messages, loading]);
+
+        function sendMessage(text) {
+          const trimmed = (text ?? input).trim();
+          if (!trimmed || loading) return;
+          const userMsg = { role: 'user', text: trimmed };
+          const updated = [...messages, userMsg];
+          setMessages(updated);
+          setInput('');
+          setLoading(true);
+          setError('');
+
+          const apiMessages = updated.map((m) =>
+            m.role === 'user'
+              ? { role: 'user', content: m.text }
+              : { role: 'assistant', content: JSON.stringify({ hanzi: m.hanzi, pinyin: m.pinyin, thai: m.thai, note: m.note }) }
+          );
+
+          const APPS_SCRIPT_URL = 'https://script.google.com/a/macros/rmu.ac.th/s/AKfycbz5EXl_AKy5zyIiNT5A4JdilyjdKx3hvOXKTDBET7kYq5s0SbAB7r0kAMqGzog6k20H/exec';
+
+          fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ messages: apiMessages, systemPrompt: SYSTEM_PROMPT }),
+          })
+            .then((res) => res.json())
+            .then((res) => {
+              setLoading(false);
+              if (res && res.success) {
+                try {
+                  let raw = res.text.replace(/```json|```/g, '').trim();
+                  const parsed = JSON.parse(raw);
+                  setMessages((prev) => [...prev, {
+                    role: 'assistant',
+                    hanzi: parsed.hanzi || '',
+                    pinyin: parsed.pinyin || '',
+                    thai: parsed.thai || '',
+                    note: parsed.note || '',
+                  }]);
+                } catch (e) {
+                  setError('รูปแบบการตอบกลับจาก AI ไม่ถูกต้อง');
+                }
+              } else {
+                setError((res && res.error) || 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
+              }
+            })
+            .catch((err) => {
+              setLoading(false);
+              setError('เกิดข้อผิดพลาดจากเซิร์ฟเวอร์: ' + err.message);
+            });
+        }
+
+        return (
+          <div>
+            <div ref={scrollRef} style={{
+              border: `1px solid ${COLORS.line}`, borderRadius: 10, background: COLORS.paperDark,
+              padding: 16, height: 420, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12,
+            }} className="csp-scroll">
+              {messages.map((m, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  {m.role === 'user' ? (
+                    <div style={{
+                      maxWidth: '78%', background: COLORS.ink, color: COLORS.paper,
+                      borderRadius: '12px 12px 2px 12px', padding: '10px 14px', fontSize: 14.5,
+                    }}>
+                      {m.text}
+                    </div>
+                  ) : (
+                    <div style={{
+                      maxWidth: '82%', background: COLORS.paper, border: `1px solid ${COLORS.line}`,
+                      borderRadius: '12px 12px 12px 2px', padding: '12px 14px',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="csp-hanzi" style={{ fontSize: 18, fontWeight: 700 }}>{m.hanzi}</span>
+                        <SpeakButton text={m.hanzi} size={13} onSpeak={speak} />
+                      </div>
+                      {m.pinyin && <div style={{ fontSize: 12.5, color: COLORS.gold, fontStyle: 'italic', marginTop: 3 }}>{m.pinyin}</div>}
+                      {m.thai && <div style={{ fontSize: 13.5, marginTop: 4 }}>{m.thai}</div>}
+                      {m.note && (
+                        <div style={{
+                          marginTop: 8, fontSize: 12.5, color: COLORS.seal, background: COLORS.sealSoft,
+                          borderRadius: 6, padding: '6px 9px',
+                        }}>
+                          💡 {m.note}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {loading && (
+                <div style={{ fontSize: 13, color: COLORS.inkSoft }}>ครูหลินกำลังพิมพ์...</div>
+              )}
+              {error && (
+                <div style={{ fontSize: 13, color: COLORS.seal }}>{error}</div>
+              )}
+            </div>
+
+            {messages.length <= 1 && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                {STARTERS.map((s) => (
+                  <button type="button" key={s} onClick={() => sendMessage(s)} style={{
+                    fontSize: 12.5, padding: '6px 12px', borderRadius: 999,
+                    border: `1px solid ${COLORS.line}`, background: COLORS.paper,
+                    color: COLORS.ink, cursor: 'pointer',
+                  }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <form 
+              onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
+              style={{ display: 'flex', gap: 8, marginTop: 12 }}
+            >
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="พิมพ์ข้อความภาษาไทย หรือ ภาษาจีน..."
+                style={{
+                  flex: 1, padding: '10px 14px', borderRadius: 8,
+                  border: `1px solid ${COLORS.line}`, background: COLORS.paperDark,
+                  fontSize: 14, outline: 'none', color: COLORS.ink,
+                }}
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  padding: '10px 18px', borderRadius: 8, border: 'none',
+                  background: COLORS.seal, color: '#fff', fontWeight: 600,
+                  fontSize: 14, cursor: loading ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6, opacity: loading ? 0.7 : 1,
+                }}
+              >
+                <Send size={16} /> ส่ง
+              </button>
+            </form>
+          </div>
+        );
+      }
+
+      // Render App
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<ChineseSpeakingTutor />);
+    </script>
+  </body>
 </html>

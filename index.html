@@ -19,6 +19,7 @@
     .csp-scroll::-webkit-scrollbar-thumb { background: #D9CFB8; border-radius: 4px; }
     .csp-opt:hover { border-color: #AC3433 !important; }
     @keyframes csp-pop { 0%{transform:scale(0.96);opacity:0.6} 100%{transform:scale(1);opacity:1} }
+    @keyframes csp-pulse { 0%{box-shadow:0 0 0 0 rgba(172,52,51,0.45)} 70%{box-shadow:0 0 0 12px rgba(172,52,51,0)} 100%{box-shadow:0 0 0 0 rgba(172,52,51,0)} }
   </style>
 </head>
   <body>
@@ -460,8 +461,12 @@
         }, []);
 
         // 2. ฟังก์ชัน speak ที่ดึงเสียงจาก State และรองรับการสั่งพูดซ้ำ
-        const speak = useCallback((text, rate = 0.88) => {
-          if (!('speechSynthesis' in window) || !text) return;
+        // callback (optional) จะถูกเรียกเมื่อพูดจบ - ใช้สำหรับ auto-speak เรียงคิว
+        const speak = useCallback((text, rate = 0.88, callback) => {
+          if (!('speechSynthesis' in window) || !text) {
+            if (typeof callback === 'function') callback();
+            return;
+          }
 
           // ยกเลิกคิวเสียงเก่า
           window.speechSynthesis.cancel();
@@ -479,6 +484,11 @@
 
           if (zh) {
             u.voice = zh;
+          }
+
+          if (typeof callback === 'function') {
+            u.onend = callback;
+            u.onerror = callback;
           }
 
           // แก้ปัญหา Chrome บล็อกเสียงถ้าไม่มี Interaction หรือสั่งพูดยาว
@@ -934,11 +944,24 @@
         const [input, setInput] = useState('');
         const [loading, setLoading] = useState(false);
         const [error, setError] = useState('');
+        const [micState, setMicState] = useState('idle'); // idle | listening | unsupported | denied
         const scrollRef = useRef(null);
+        const recRef = useRef(null);
+        const hasSpokenGreeting = useRef(false);
 
         useEffect(() => {
           if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }, [messages, loading]);
+
+        // ยกเลิกการฟังไมค์เมื่อออกจากหน้านี้
+        useEffect(() => {
+          return () => {
+            if (recRef.current) {
+              try { recRef.current.abort(); } catch (e) {}
+            }
+            window.speechSynthesis && window.speechSynthesis.cancel();
+          };
+        }, []);
 
         function sendMessage(text) {
           const trimmed = (text ?? input).trim();
@@ -970,13 +993,18 @@
                 try {
                   let raw = res.text.replace(/```json|```/g, '').trim();
                   const parsed = JSON.parse(raw);
-                  setMessages((prev) => [...prev, {
+                  const newMsg = {
                     role: 'assistant',
                     hanzi: parsed.hanzi || '',
                     pinyin: parsed.pinyin || '',
                     thai: parsed.thai || '',
                     note: parsed.note || '',
-                  }]);
+                  };
+                  setMessages((prev) => [...prev, newMsg]);
+                  // พูดตอบอัตโนมัติทันทีที่ได้รับคำตอบ
+                  if (newMsg.hanzi) {
+                    speak(newMsg.hanzi);
+                  }
                 } catch (e) {
                   setError('รูปแบบการตอบกลับจาก AI ไม่ถูกต้อง');
                 }
@@ -989,6 +1017,73 @@
               setError('เกิดข้อผิดพลาดจากเซิร์ฟเวอร์: ' + err.message);
             });
         }
+
+        // ---- ไมค์: พูดแล้วส่งเข้าแชทให้อัตโนมัติ ----
+        function startListening() {
+          const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+          if (!SR) {
+            setMicState('unsupported');
+            return;
+          }
+
+          if (recRef.current) {
+            try { recRef.current.abort(); } catch (e) {}
+          }
+
+          // หยุดเสียง AI ที่อาจกำลังพูดอยู่ ก่อนเปิดไมค์ฟัง
+          window.speechSynthesis && window.speechSynthesis.cancel();
+
+          try {
+            const rec = new SR();
+            // รองรับทั้งภาษาไทยและจีน โดยตั้งเป็นจีนก่อน (ผู้เรียนอาจพูดจีนฝึกออกเสียง)
+            rec.lang = 'zh-CN';
+            rec.interimResults = false;
+            rec.maxAlternatives = 3;
+            recRef.current = rec;
+
+            rec.onstart = () => {
+              setMicState('listening');
+            };
+
+            rec.onresult = (e) => {
+              if (!e.results || !e.results[0]) return;
+              const alts = Array.from(e.results[0]).map((r) => r.transcript);
+              const spokenText = (alts[0] || '').trim();
+              if (spokenText) {
+                sendMessage(spokenText);
+              }
+            };
+
+            rec.onerror = (e) => {
+              console.error('Speech recognition error:', e.error);
+              if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+                setMicState('denied');
+              } else {
+                setMicState('idle');
+              }
+            };
+
+            rec.onend = () => {
+              setMicState((p) => (p === 'listening' ? 'idle' : p));
+            };
+
+            rec.start();
+          } catch (err) {
+            console.error('Mic start error:', err);
+            setMicState('unsupported');
+          }
+        }
+
+        function stopListening() {
+          if (recRef.current) recRef.current.stop();
+        }
+
+        const micLabel = {
+          idle: 'พูด',
+          listening: 'กำลังฟัง...',
+          unsupported: 'ไม่รองรับ',
+          denied: 'ไม่อนุญาต',
+        }[micState];
 
         return (
           <div>
@@ -1036,6 +1131,17 @@
               )}
             </div>
 
+            {micState === 'denied' && (
+              <div style={{ marginTop: 10, fontSize: 12.5, color: COLORS.seal }}>
+                ไม่สามารถเข้าถึงไมโครโฟนได้ กรุณาอนุญาตการใช้งานไมโครโฟนในเบราว์เซอร์ แล้วลองใหม่
+              </div>
+            )}
+            {micState === 'unsupported' && (
+              <div style={{ marginTop: 10, fontSize: 12.5, color: COLORS.seal }}>
+                เบราว์เซอร์นี้ไม่รองรับการพูดผ่านไมโครโฟน กรุณาพิมพ์ข้อความแทน
+              </div>
+            )}
+
             {messages.length <= 1 && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
                 {STARTERS.map((s) => (
@@ -1065,6 +1171,23 @@
                   fontSize: 14, outline: 'none', color: COLORS.ink,
                 }}
               />
+              <button
+                type="button"
+                onClick={micState === 'listening' ? stopListening : startListening}
+                disabled={loading}
+                title={micLabel}
+                style={{
+                  padding: '10px 14px', borderRadius: 8, border: 'none',
+                  background: micState === 'listening' ? COLORS.seal : COLORS.bamboo,
+                  color: '#fff', fontWeight: 600, fontSize: 14,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  opacity: loading ? 0.6 : 1,
+                  animation: micState === 'listening' ? 'csp-pulse 1.4s infinite' : 'none',
+                }}
+              >
+                {micState === 'listening' ? <Square size={16} /> : <Mic size={16} />}
+              </button>
               <button
                 type="submit"
                 disabled={loading}
